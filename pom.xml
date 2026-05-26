@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.octopus</groupId>
+    <groupId>com.octopus.demo</groupId>
     <artifactId>octopus-demo-api-admin</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>octopus-demo-api-admin</name>
@@ -21,10 +21,26 @@
         <java.version>21</java.version>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.octopus.demo</groupId>
+                <artifactId>java-common-dependencies</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.octopus.demo</groupId>
+            <artifactId>java-common-bean</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
