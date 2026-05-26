@@ -21,6 +21,7 @@ class DemoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.msg").value("success"))
-                .andExpect(jsonPath("$.data").value("hello from octopus-demo-api-admin"));
+                .andExpect(jsonPath("$.data").value("hello from octopus-demo-api-admin"))
+                .andExpect(jsonPath("$.timestamp").isNumber());
     }
 }
