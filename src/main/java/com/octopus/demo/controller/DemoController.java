@@ -1,15 +1,14 @@
 package com.octopus.demo.controller;
 
+import com.octopus.demo.common.bean.R;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @RestController
 public class DemoController {
 
     @GetMapping("/demo")
-    public Map<String, String> demo() {
-        return Map.of("message", "hello from octopus-demo-api-admin");
+    public R<String> demo() {
+        return R.ok("hello from octopus-demo-api-admin");
     }
 }
