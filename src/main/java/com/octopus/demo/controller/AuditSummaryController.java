@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.format.annotation.DateTimeFormat.ISO;
 import org.springframework.http.HttpEntity;
@@ -16,12 +17,16 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Gateway 审计聚合端点。
@@ -32,6 +37,8 @@ import java.util.Map;
 @RequestMapping("/api/gateway/audit-summary")
 public class AuditSummaryController {
     private static final Logger log = LoggerFactory.getLogger(AuditSummaryController.class);
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
+        new ParameterizedTypeReference<>() {};
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -59,10 +66,20 @@ public class AuditSummaryController {
             @RequestParam(defaultValue = "100") int limit) {
 
         int clampedLimit = Math.max(1, Math.min(limit, 500));
-        ServiceCallResult userResult = fetchAuditEvents(
-            buildUrl(userServiceUrl, "/api/users/audit", userId, action, entityType, from, to, clampedLimit));
-        ServiceCallResult adminResult = fetchAuditEvents(
-            buildUrl(adminServiceUrl, "/api/admin/audit-logs", userId, action, entityType, from, to, clampedLimit));
+
+        // Capture ThreadLocal context before async execution
+        Long currentUserId = UserContext.getUserId();
+
+        // Parallel downstream calls to reduce worst-case latency
+        String userUrl = buildUrl(userServiceUrl, "/api/users/audit", userId, action, entityType, from, to, clampedLimit);
+        String adminUrl = buildUrl(adminServiceUrl, "/api/admin/audit-logs", userId, action, entityType, from, to, clampedLimit);
+
+        CompletableFuture<ServiceCallResult> userFuture = CompletableFuture.supplyAsync(() -> fetchAuditEvents(userUrl, currentUserId));
+        CompletableFuture<ServiceCallResult> adminFuture = CompletableFuture.supplyAsync(() -> fetchAuditEvents(adminUrl, currentUserId));
+        CompletableFuture.allOf(userFuture, adminFuture).join();
+
+        ServiceCallResult userResult = userFuture.join();
+        ServiceCallResult adminResult = adminFuture.join();
 
         AuditSummaryResponse summary = new AuditSummaryResponse(
             userResult.events().size(),
@@ -82,17 +99,16 @@ public class AuditSummaryController {
     /**
      * 从下游服务获取审计事件，转发 X-User-Id 认证头。
      * 下游不可用时返回空列表并标记 available=false。
+     * 异常分类处理：4xx/5xx/连接超时 降级，其他异常上抛。
      */
-    @SuppressWarnings("unchecked")
-    private ServiceCallResult fetchAuditEvents(String url) {
+    private ServiceCallResult fetchAuditEvents(String url, Long currentUserId) {
         try {
             HttpHeaders headers = new HttpHeaders();
-            Long currentUserId = UserContext.getUserId();
             if (currentUserId != null) {
                 headers.set("X-User-Id", currentUserId.toString());
             }
             HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, Map.class);
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, MAP_TYPE);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Object data = response.getBody().get("data");
                 if (data instanceof List<?> list) {
@@ -103,8 +119,17 @@ public class AuditSummaryController {
                 }
             }
             return new ServiceCallResult(List.of(), true);
+        } catch (HttpClientErrorException e) {
+            log.warn("下游返回 4xx [{}]: {}", url, e.getStatusCode());
+            return new ServiceCallResult(List.of(), false);
+        } catch (HttpServerErrorException e) {
+            log.warn("下游返回 5xx [{}]: {}", url, e.getStatusCode());
+            return new ServiceCallResult(List.of(), false);
+        } catch (ResourceAccessException e) {
+            log.warn("下游不可达 [{}]: {}", url, e.getMessage());
+            return new ServiceCallResult(List.of(), false);
         } catch (Exception e) {
-            log.warn("获取审计事件失败 [{}]: {}", url, e.getMessage());
+            log.error("未知错误获取审计事件 [{}]", url, e);
             return new ServiceCallResult(List.of(), false);
         }
     }

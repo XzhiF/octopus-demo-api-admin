@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -50,9 +51,9 @@ class AuditSummaryControllerTest {
             "data", List.of()
         );
 
-        when(restTemplate.exchange(contains("/api/users/audit"), eq(HttpMethod.GET), any(HttpEntity.class), eq(Map.class)))
+        when(restTemplate.exchange(contains("/api/users/audit"), eq(HttpMethod.GET), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
             .thenReturn(new ResponseEntity<>(userResponse, HttpStatus.OK));
-        when(restTemplate.exchange(contains("/api/admin/audit-logs"), eq(HttpMethod.GET), any(HttpEntity.class), eq(Map.class)))
+        when(restTemplate.exchange(contains("/api/admin/audit-logs"), eq(HttpMethod.GET), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
             .thenReturn(new ResponseEntity<>(adminResponse, HttpStatus.OK));
 
         mockMvc.perform(get("/api/gateway/audit-summary").header("X-User-Id", "1"))
@@ -66,7 +67,7 @@ class AuditSummaryControllerTest {
     @Test
     @DisplayName("GET /api/gateway/audit-summary propagates X-User-Id header to downstream services")
     void getAuditSummary_propagatesAuthHeader() throws Exception {
-        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(Map.class)))
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
             .thenReturn(new ResponseEntity<>(Map.of("code", 200, "data", List.of()), HttpStatus.OK));
 
         mockMvc.perform(get("/api/gateway/audit-summary").header("X-User-Id", "42"))
@@ -81,16 +82,16 @@ class AuditSummaryControllerTest {
                     String userId = entity.getHeaders().getFirst("X-User-Id");
                     return "42".equals(userId);
                 }),
-                eq(Map.class)
+                any(ParameterizedTypeReference.class)
             );
     }
 
     @Test
     @DisplayName("GET /api/gateway/audit-summary marks DOWN when downstream fails")
     void getAuditSummary_marksDownOnFailure() throws Exception {
-        when(restTemplate.exchange(contains("/api/users/audit"), eq(HttpMethod.GET), any(HttpEntity.class), eq(Map.class)))
+        when(restTemplate.exchange(contains("/api/users/audit"), eq(HttpMethod.GET), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
             .thenThrow(new RuntimeException("Connection refused"));
-        when(restTemplate.exchange(contains("/api/admin/audit-logs"), eq(HttpMethod.GET), any(HttpEntity.class), eq(Map.class)))
+        when(restTemplate.exchange(contains("/api/admin/audit-logs"), eq(HttpMethod.GET), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
             .thenReturn(new ResponseEntity<>(Map.of("code", 200, "data", List.of()), HttpStatus.OK));
 
         mockMvc.perform(get("/api/gateway/audit-summary").header("X-User-Id", "1"))
