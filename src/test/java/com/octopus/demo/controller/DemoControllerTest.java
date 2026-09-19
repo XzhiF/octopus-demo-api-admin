@@ -24,4 +24,25 @@ class DemoControllerTest {
                 .andExpect(jsonPath("$.data").value("hello from octopus-demo-api-admin"))
                 .andExpect(jsonPath("$.timestamp").isNumber());
     }
+
+    @Test
+    void luhnReturnsTrueForValidCardNumber() throws Exception {
+        mockMvc.perform(get("/demo/luhn").param("no", "4539578763621486"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(true));
+    }
+
+    @Test
+    void luhnReturnsFalseForGarbageInput() throws Exception {
+        mockMvc.perform(get("/demo/luhn").param("no", "abc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(false));
+    }
+
+    @Test
+    void luhnReturnsFalseWhenParamMissing() throws Exception {
+        mockMvc.perform(get("/demo/luhn"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(false));
+    }
 }
