@@ -24,4 +24,18 @@ class DemoControllerTest {
                 .andExpect(jsonPath("$.data").value("hello from octopus-demo-api-admin"))
                 .andExpect(jsonPath("$.timestamp").isNumber());
     }
+
+    @Test
+    void truncateTruncatesOverLongText() throws Exception {
+        mockMvc.perform(get("/demo/truncate").param("text", "abcdefghij").param("len", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("abcd…"));
+    }
+
+    @Test
+    void truncateKeepsShortTextAsIs() throws Exception {
+        mockMvc.perform(get("/demo/truncate").param("text", "ab"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("ab"));
+    }
 }
