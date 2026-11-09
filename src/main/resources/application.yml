@@ -1,0 +1,19 @@
+server:
+  port: 18081
+
+spring:
+  application:
+    name: octopus-demo-api-admin
+
+bff:
+  routes:
+    system:
+      - /api/auth
+      - /api/users
+      - /api/roles
+      - /api/menus
+    user: []
+  upstreams:
+    system: http://localhost:${SERVICE_ADMIN_PORT:18080}
+  cors:
+    allowed-origin: http://localhost:${WEB_ADMIN_PORT:13000}
