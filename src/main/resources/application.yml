@@ -12,6 +12,8 @@ bff:
       - /api/users
       - /api/roles
       - /api/menus
+      - /api/configs
+      - /api/dicts
     user: []
   upstreams:
     system: http://localhost:${SERVICE_ADMIN_PORT:18080}
