@@ -111,6 +111,7 @@ public class ProxyFilter extends OncePerRequestFilter {
         copyHeader(request, builder, HttpHeaders.AUTHORIZATION);
         copyHeader(request, builder, HttpHeaders.CONTENT_TYPE);
         copyHeader(request, builder, HttpHeaders.ACCEPT);
+        forwardClientAddress(request, builder);
 
         HttpResponse<byte[]> upstreamResponse = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
 
@@ -124,6 +125,21 @@ public class ProxyFilter extends OncePerRequestFilter {
         String value = request.getHeader(name);
         if (value != null) {
             builder.header(name, value);
+        }
+    }
+
+    /** Preserves the client-provided chain and appends the direct peer address. */
+    private void forwardClientAddress(HttpServletRequest request, HttpRequest.Builder builder) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        String remoteAddr = request.getRemoteAddr();
+        String chain;
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            chain = remoteAddr == null || remoteAddr.isBlank() ? forwardedFor : forwardedFor + ", " + remoteAddr;
+        } else {
+            chain = remoteAddr;
+        }
+        if (chain != null && !chain.isBlank()) {
+            builder.header("X-Forwarded-For", chain);
         }
     }
 
