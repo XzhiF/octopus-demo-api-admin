@@ -16,8 +16,10 @@ bff:
       - /api/dicts
       - /api/jobs
       - /api/logs
-    user: []
+    user:
+      - /api/member
   upstreams:
     system: http://localhost:${SERVICE_ADMIN_PORT:18080}
+    user: http://localhost:${SERVICE_USER_PORT:18082}
   cors:
     allowed-origin: http://localhost:${WEB_ADMIN_PORT:13000}
